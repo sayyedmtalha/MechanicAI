@@ -4,13 +4,27 @@ import tempfile
 import re
 from backend import setup_agent, execute_user_code, generate_cad_code
 from param_utils import extract_params, update_code_with_params
-from stl_utils import create_stl_for_streamlit, verify_stl_format
+from stl_utils import create_stl_for_streamlit, verify_stl_format, check_dependencies
+
+# Check dependencies and show warnings
+dependency_issues = check_dependencies()
+if dependency_issues:
+    for issue in dependency_issues:
+        st.error(issue)
+    st.warning("🔧 The app will run in limited mode without full 3D functionality.")
+
+try:
+    from streamlit_stl import stl_from_file
+    STREAML_STL_AVAILABLE = True
+except ImportError:
+    STREAML_STL_AVAILABLE = False
+    if not dependency_issues:
+        st.warning("⚠️ streamlit-stl not installed. 3D viewer will not work.")
 
 try:
     from build123d import export_stl, export_step
-    from streamlit_stl import stl_from_file
 except ImportError:
-    st.warning("⚠️ build123d or streamlit_stl not installed. 3D viewer may not work.")
+    st.warning("⚠️ build123d not installed. 3D viewer may not work.")
 
 # ==========================================
 # PAGE CONFIG & STYLING
@@ -350,11 +364,21 @@ with col_viewer:
         # Display the 3D model
         try:
             part_to_show = st.session_state.generated_part
-            ascii_stl_path = create_stl_for_streamlit(part_to_show)
             
-            if ascii_stl_path:
-                # Use a metallic color that stands out against dark background
-                stl_from_file(file_path=ascii_stl_path, color="#C0C0C0", height=400)
+            if STREAML_STL_AVAILABLE and part_to_show:
+                ascii_stl_path = create_stl_for_streamlit(part_to_show)
+                
+                if ascii_stl_path:
+                    # Use a metallic color that stands out against dark background
+                    stl_from_file(file_path=ascii_stl_path, color="#C0C0C0", height=400)
+                else:
+                    st.error("❌ Failed to create 3D preview")
+            elif not STREAML_STL_AVAILABLE:
+                st.warning("⚠️ 3D viewer not available (streamlit-stl missing)")
+                if part_to_show:
+                    st.info("📦 Component created successfully! Use download buttons below to get STL file.")
+                else:
+                    st.error("❌ No component to display")
             else:
                 st.error("❌ Failed to create 3D preview")
         except Exception as e:
