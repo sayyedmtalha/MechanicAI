@@ -5,19 +5,17 @@ import math
 import os
 
 # Note: build123d removed for cloud deployment compatibility
-# CAD functionality will use placeholder geometries instead
+# CAD functionality will use placeholder geometries with trimesh
 
-# Import gggears for professional gear generation
+# Import trimesh for 3D geometry creation
 try:
-    from gggears.src.py_gearworks.wrapper import (
-        SpurGear, HelicalGear, BevelGear, CycloidGear,
-        SpurRingGear, HelicalRingGear, InvoluteRack, HelicalRack
-    )
-    GGGEARS_AVAILABLE = True
+    import trimesh
+    TRIMESH_AVAILABLE = True
 except ImportError:
-    GGGEARS_AVAILABLE = False
+    TRIMESH_AVAILABLE = False
+    st.error("❌ trimesh not available. 3D visualization will not work.")
 
-# Import bd_warehouse for professional fastener generation
+# Import bd_warehouse for professional component definitions only
 try:
     from bd_warehouse.fastener import (
         HexHeadScrew, HexNut, PlainWasher, SocketHeadCapScrew,
@@ -40,10 +38,12 @@ try:
         SocketWeldFlange, WeldNeckFlange
     )
     BD_WAREHOUSE_AVAILABLE = True
-    print("BD Warehouse imports successful")
 except ImportError as e:
     print(f"BD Warehouse import failed: {e}")
     BD_WAREHOUSE_AVAILABLE = False
+
+# Set gggears as unavailable for cloud deployment
+GGGEARS_AVAILABLE = False
 
 
 # ==========================================
@@ -52,8 +52,8 @@ except ImportError as e:
 
 def create_placeholder_bolt(size, length):
     """Create placeholder bolt geometry for cloud deployment"""
-    # Create a simple cylinder as placeholder
-    import trimesh
+    if not TRIMESH_AVAILABLE:
+        return None
     # Extract numeric size from M notation
     if size.startswith('M'):
         try:
@@ -69,7 +69,8 @@ def create_placeholder_bolt(size, length):
 
 def create_placeholder_nut(size):
     """Create placeholder nut geometry for cloud deployment"""
-    import trimesh
+    if not TRIMESH_AVAILABLE:
+        return None
     # Extract numeric size from M notation
     if size.startswith('M'):
         try:
@@ -85,7 +86,8 @@ def create_placeholder_nut(size):
 
 def create_placeholder_washer(size):
     """Create placeholder washer geometry for cloud deployment"""
-    import trimesh
+    if not TRIMESH_AVAILABLE:
+        return None
     # Extract numeric size from M notation
     if size.startswith('M'):
         try:
@@ -101,7 +103,8 @@ def create_placeholder_washer(size):
 
 def create_placeholder_bearing(bearing_type, size):
     """Create placeholder bearing geometry for cloud deployment"""
-    import trimesh
+    if not TRIMESH_AVAILABLE:
+        return None
     # Extract outer diameter from size string (e.g., "M8-16-4" -> 16)
     try:
         parts = size.split('-')
@@ -118,7 +121,8 @@ def create_placeholder_bearing(bearing_type, size):
 
 def create_placeholder_gear(module, num_teeth, face_width):
     """Create placeholder gear geometry for cloud deployment"""
-    import trimesh
+    if not TRIMESH_AVAILABLE:
+        return None
     # Calculate pitch diameter
     pitch_diameter = module * num_teeth
     # Create cylinder as placeholder
@@ -127,7 +131,8 @@ def create_placeholder_gear(module, num_teeth, face_width):
 
 def create_placeholder_pipe(nps):
     """Create placeholder pipe geometry for cloud deployment"""
-    import trimesh
+    if not TRIMESH_AVAILABLE:
+        return None
     # Convert NPS to approximate diameter (in mm)
     try:
         nps_float = float(nps)
@@ -141,7 +146,8 @@ def create_placeholder_pipe(nps):
 
 def create_placeholder_flange(nps, pressure_class):
     """Create placeholder flange geometry for cloud deployment"""
-    import trimesh
+    if not TRIMESH_AVAILABLE:
+        return None
     # Convert NPS to approximate diameter (in mm)
     try:
         nps_float = float(nps)
@@ -155,7 +161,8 @@ def create_placeholder_flange(nps, pressure_class):
 
 def create_placeholder_thread(diameter, length):
     """Create placeholder thread geometry for cloud deployment"""
-    import trimesh
+    if not TRIMESH_AVAILABLE:
+        return None
     # Create cylinder as placeholder
     cylinder = trimesh.creation.cylinder(radius=diameter/2, height=length)
     return cylinder
