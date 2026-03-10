@@ -6,10 +6,11 @@ smolagents>=0.1.0
 litellm>=1.45.0
 
 # 3D File Processing and Display
-trimesh>=4.0.0
 streamlit-stl==0.0.6
 
-# Professional Component Libraries
+# Professional CAD Libraries
+build123d>=0.3.0
+numpy>=1.24.0
 bd-warehouse>=0.1.1
 # Note: gggears is included locally in the gggears/ folder
 
@@ -25,6 +26,3 @@ tqdm>=4.65.0
 # Security and Environment
 python-dotenv>=1.0.0
 cryptography>=41.0.0
-
-# Note: build123d and numpy removed for cloud deployment compatibility
-# CAD functionality will use placeholder geometries instead
