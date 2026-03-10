@@ -1,28 +1,21 @@
 import streamlit as st
 from smolagents import LiteLLMModel
 from litellm import completion
+import build123d as b3d
 import math
 import os
 
-# Try to import build123d first, fallback to trimesh-only mode
+# Import gggears for professional gear generation
 try:
-    import build123d as b3d
-    import numpy as np
-    BUILD123D_AVAILABLE = True
-    print("✅ build123d imported successfully - Full CAD functionality available")
-except ImportError as e:
-    print(f"⚠️ build123d import failed: {e}")
-    BUILD123D_AVAILABLE = False
-
-# Import trimesh for 3D geometry creation (always available)
-try:
-    import trimesh
-    TRIMESH_AVAILABLE = True
+    from gggears.src.py_gearworks.wrapper import (
+        SpurGear, HelicalGear, BevelGear, CycloidGear,
+        SpurRingGear, HelicalRingGear, InvoluteRack, HelicalRack
+    )
+    GGGEARS_AVAILABLE = True
 except ImportError:
-    TRIMESH_AVAILABLE = False
-    st.error("❌ trimesh not available. 3D visualization will not work.")
+    GGGEARS_AVAILABLE = False
 
-# Import bd_warehouse for professional component definitions only
+# Import bd_warehouse for professional fastener generation
 try:
     from bd_warehouse.fastener import (
         HexHeadScrew, HexNut, PlainWasher, SocketHeadCapScrew,
@@ -49,256 +42,41 @@ except ImportError as e:
     print(f"BD Warehouse import failed: {e}")
     BD_WAREHOUSE_AVAILABLE = False
 
-# Try to import gggears for professional gear generation
-try:
-    from gggears.src.py_gearworks.wrapper import (
-        SpurGear, HelicalGear, BevelGear, CycloidGear,
-        SpurRingGear, HelicalRingGear, InvoluteRack, HelicalRack
-    )
-    GGGEARS_AVAILABLE = True
-except ImportError:
-    GGGEARS_AVAILABLE = False
-
 
 # ==========================================
-# PLACEHOLDER GEOMETRY FUNCTIONS (Cloud Compatible)
-# ==========================================
-
-def create_placeholder_bolt(size, length):
-    """Create bolt geometry using build123d if available, otherwise trimesh"""
-    if BUILD123D_AVAILABLE and BD_WAREHOUSE_AVAILABLE:
-        try:
-            # Extract numeric size from M notation
-            if size.startswith('M'):
-                try:
-                    diameter = float(size[1:])
-                except:
-                    diameter = 8.0  # Default
-            else:
-                diameter = 8.0
-            
-            # Convert size to BD Warehouse format (add pitch if not present)
-            if '-' not in size and size.startswith('M'):
-                pitch_map = {
-                    'M1.6': '0.35', 'M2': '0.4', 'M2.5': '0.45', 'M3': '0.5',
-                    'M3.5': '0.6', 'M4': '0.7', 'M5': '0.8', 'M6': '1',
-                    'M8': '1.25', 'M10': '1.5', 'M12': '1.75', 'M14': '2',
-                    'M16': '2', 'M18': '2.5', 'M20': '2.5', 'M22': '2.5',
-                    'M24': '3', 'M27': '3', 'M30': '3.5', 'M33': '3.5',
-                    'M36': '4', 'M39': '4', 'M42': '4.5', 'M45': '4.5',
-                    'M48': '5', 'M52': '5', 'M56': '5.5', 'M60': '5.5', 'M64': '6'
-                }
-                if size in pitch_map:
-                    size_with_pitch = f"{size}-{pitch_map[size]}"
-                else:
-                    size_with_pitch = size
-            else:
-                size_with_pitch = size
-            
-            # Create actual bolt using build123d and BD Warehouse
-            bolt = HexHeadScrew(size=size_with_pitch, length=length)
-            return b3d.Part(bolt.wrapped)
-        except Exception as e:
-            print(f"build123d bolt creation failed: {e}")
-    
-    # Fallback to trimesh bolt
-    if not TRIMESH_AVAILABLE:
-        return None
-    
-    # Extract numeric size from M notation
-    if size.startswith('M'):
-        try:
-            diameter = float(size[1:])
-        except:
-            diameter = 8.0  # Default
-    else:
-        diameter = 8.0
-    
-    # Create better bolt geometry with hex head
-    head_height = diameter * 0.6
-    head_width = diameter * 1.5
-    
-    # Create hex head
-    head = trimesh.creation.cylinder(radius=head_width/2, height=head_height)
-    
-    # Create shaft
-    shaft = trimesh.creation.cylinder(radius=diameter/2, height=length)
-    
-    # Position components
-    head.apply_translation([0, 0, length])
-    shaft.apply_translation([0, 0, 0])
-    
-    # Combine
-    bolt = head + shaft
-    return bolt
-
-def create_placeholder_nut(size):
-    """Create placeholder nut geometry for cloud deployment"""
-    if not TRIMESH_AVAILABLE:
-        return None
-    # Extract numeric size from M notation
-    if size.startswith('M'):
-        try:
-            diameter = float(size[1:])
-        except:
-            diameter = 8.0  # Default
-    else:
-        diameter = 8.0
-    
-    # Create cylinder as placeholder
-    cylinder = trimesh.creation.cylinder(radius=diameter/2, height=diameter*0.8)
-    return cylinder
-
-def create_placeholder_washer(size):
-    """Create placeholder washer geometry for cloud deployment"""
-    if not TRIMESH_AVAILABLE:
-        return None
-    # Extract numeric size from M notation
-    if size.startswith('M'):
-        try:
-            diameter = float(size[1:])
-        except:
-            diameter = 8.0  # Default
-    else:
-        diameter = 8.0
-    
-    # Create thin cylinder as placeholder
-    cylinder = trimesh.creation.cylinder(radius=diameter/2, height=diameter*0.2)
-    return cylinder
-
-def create_placeholder_bearing(bearing_type, size):
-    """Create placeholder bearing geometry for cloud deployment"""
-    if not TRIMESH_AVAILABLE:
-        return None
-    # Extract outer diameter from size string (e.g., "M8-16-4" -> 16)
-    try:
-        parts = size.split('-')
-        if len(parts) >= 2:
-            outer_diameter = float(parts[1])
-        else:
-            outer_diameter = 16.0
-    except:
-        outer_diameter = 16.0
-    
-    # Create cylinder as placeholder
-    cylinder = trimesh.creation.cylinder(radius=outer_diameter/2, height=outer_diameter/4)
-    return cylinder
-
-def create_placeholder_gear(module, num_teeth, face_width):
-    """Create placeholder gear geometry for cloud deployment"""
-    if not TRIMESH_AVAILABLE:
-        return None
-    # Calculate pitch diameter
-    pitch_diameter = module * num_teeth
-    # Create cylinder as placeholder
-    cylinder = trimesh.creation.cylinder(radius=pitch_diameter/2, height=face_width)
-    return cylinder
-
-def create_placeholder_pipe(nps):
-    """Create placeholder pipe geometry for cloud deployment"""
-    if not TRIMESH_AVAILABLE:
-        return None
-    # Convert NPS to approximate diameter (in mm)
-    try:
-        nps_float = float(nps)
-        outer_diameter = nps_float * 25.4  # Convert inches to mm
-    except:
-        outer_diameter = 50.8  # Default 2" pipe
-    
-    # Create cylinder as placeholder
-    cylinder = trimesh.creation.cylinder(radius=outer_diameter/2, height=100)
-    return cylinder
-
-def create_placeholder_flange(nps, pressure_class):
-    """Create placeholder flange geometry for cloud deployment"""
-    if not TRIMESH_AVAILABLE:
-        return None
-    # Convert NPS to approximate diameter (in mm)
-    try:
-        nps_float = float(nps)
-        outer_diameter = nps_float * 25.4 * 1.5  # Flanges are wider
-    except:
-        outer_diameter = 76.2  # Default 2" flange
-    
-    # Create cylinder as placeholder
-    cylinder = trimesh.creation.cylinder(radius=outer_diameter/2, height=20)
-    return cylinder
-
-def create_placeholder_thread(diameter, length):
-    """Create placeholder thread geometry for cloud deployment"""
-    if not TRIMESH_AVAILABLE:
-        return None
-    # Create cylinder as placeholder
-    cylinder = trimesh.creation.cylinder(radius=diameter/2, height=length)
-    return cylinder
-
-# ==========================================
-# GGGEARS PROFESSIONAL GEAR FUNCTIONS ONLY
+# GGGEARS PROFESSIONAL GEAR FUNCTIONS
 # ==========================================
 
 def create_spur_gear(module, num_teeth, face_width, bore_diameter=0, pressure_angle=20):
-    """Create professional spur gear using gggears library or build123d fallback"""
-    if BUILD123D_AVAILABLE and GGGEARS_AVAILABLE:
-        try:
-            gear = SpurGear(
-                number_of_teeth=num_teeth,
-                module=module,
-                pressure_angle=math.radians(pressure_angle),
-                height=face_width
-            )
-            
-            part = gear.build_part()
-            
-            if bore_diameter > 0:
-                bore = b3d.Cylinder(radius=bore_diameter/2, height=face_width)
-                part = part - bore
-            
-            return part
-        except Exception as e:
-            print(f"GGGears gear creation failed: {e}")
-    
-    # Fallback to trimesh gear
-    if not TRIMESH_AVAILABLE:
+    """Create professional spur gear using gggears library"""
+    if not GGGEARS_AVAILABLE:
         return None
     
-    # Calculate gear dimensions
-    pitch_diameter = module * num_teeth
-    outer_diameter = pitch_diameter + 2 * module
-    tooth_height = module
-    
-    # Create gear body
-    gear_body = trimesh.creation.cylinder(radius=outer_diameter/2, height=face_width)
-    
-    # Create bore if specified
-    if bore_diameter > 0:
-        bore = trimesh.creation.cylinder(radius=bore_diameter/2, height=face_width)
-        gear_body = gear_body.difference(bore)
-    
-    # Create simple tooth representation (cylinders around the edge)
-    tooth_count = 8  # Simplified teeth representation
-    teeth = []
-    for i in range(tooth_count):
-        angle = (2 * math.pi * i) / tooth_count
-        tooth_x = (outer_diameter/2) * math.cos(angle)
-        tooth_y = (outer_diameter/2) * math.sin(angle)
-        tooth = trimesh.creation.cylinder(radius=tooth_height/2, height=face_width)
-        tooth.apply_translation([tooth_x, tooth_y, 0])
-        teeth.append(tooth)
-    
-    # Combine all teeth
-    if teeth:
-        all_teeth = teeth[0]
-        for tooth in teeth[1:]:
-            all_teeth = all_teeth + tooth
-        gear_body = gear_body + all_teeth
-    
-    return gear_body
+    try:
+        gear = SpurGear(
+            number_of_teeth=num_teeth,
+            module=module,
+            pressure_angle=math.radians(pressure_angle),
+            height=face_width
+        )
+        
+        part = gear.build_part()
+        
+        if bore_diameter > 0:
+            bore = b3d.Cylinder(radius=bore_diameter/2, height=face_width)
+            part = part - bore
+        
+        return part
+        
+    except Exception as e:
+        print(f"Spur gear creation failed: {e}")
+        return None
 
 
 def create_helical_gear(module, num_teeth, helix_angle_deg, face_width, bore_diameter=0, pressure_angle=20):
     """Create professional helical gear using gggears library"""
     if not GGGEARS_AVAILABLE:
-        return create_placeholder_gear(module, num_teeth, face_width)
+        return None
     
     try:
         gear = HelicalGear(
@@ -312,21 +90,20 @@ def create_helical_gear(module, num_teeth, helix_angle_deg, face_width, bore_dia
         part = gear.build_part()
         
         if bore_diameter > 0:
-            # Use placeholder geometry since build123d is not available
-            return create_placeholder_gear(module, num_teeth, face_width)
+            bore = b3d.Cylinder(radius=bore_diameter/2, height=face_width)
+            part = part - bore
         
-        # Return placeholder geometry for cloud compatibility
-        return create_placeholder_gear(module, num_teeth, face_width)
+        return part
         
     except Exception as e:
         print(f"Helical gear creation failed: {e}")
-        return create_placeholder_gear(module, num_teeth, face_width)
+        return None
 
 
 def create_bevel_gear(module, num_teeth, cone_angle_deg, face_width, bore_diameter=0, pressure_angle=20):
     """Create professional bevel gear using gggears library"""
     if not GGGEARS_AVAILABLE:
-        return create_placeholder_gear(module, num_teeth, face_width)
+        return None
     
     try:
         gear = BevelGear(
@@ -340,15 +117,14 @@ def create_bevel_gear(module, num_teeth, cone_angle_deg, face_width, bore_diamet
         part = gear.build_part()
         
         if bore_diameter > 0:
-            # Use placeholder geometry since build123d is not available
-            return create_placeholder_gear(module, num_teeth, face_width)
+            bore = b3d.Cylinder(radius=bore_diameter/2, height=face_width)
+            part = part - bore
         
-        # Return placeholder geometry for cloud compatibility
-        return create_placeholder_gear(module, num_teeth, face_width)
+        return part
         
     except Exception as e:
         print(f"Bevel gear creation failed: {e}")
-        return create_placeholder_gear(module, num_teeth, face_width)
+        return None
 
 
 def create_cycloid_gear(module, num_teeth, face_width, bore_diameter=0):
@@ -479,8 +255,7 @@ def create_helical_rack_gear(module, num_teeth, helix_angle_deg, face_width, hei
 def create_hex_bolt(size, length, fastener_type="iso4014"):
     """Create professional hex bolt using bd_warehouse"""
     if not BD_WAREHOUSE_AVAILABLE:
-        # Return placeholder geometry
-        return create_placeholder_bolt(size, length)
+        return None
     
     try:
         # Convert size to BD Warehouse format (add pitch if not present)
@@ -499,16 +274,15 @@ def create_hex_bolt(size, length, fastener_type="iso4014"):
                 size = f"{size}-{pitch_map[size]}"
         
         bolt = HexHeadScrew(size=size, length=length, fastener_type=fastener_type)
-        # Return placeholder geometry instead of build123d part
-        return create_placeholder_bolt(size, length)
+        return b3d.Part(bolt.wrapped)  # Wrap TopoDS in build123d Part
     except Exception as e:
         print(f"Bolt creation failed: {e}")
-        return create_placeholder_bolt(size, length)
+        return None
 
 def create_hex_nut(size, fastener_type="iso4032"):
     """Create professional hex nut using bd_warehouse"""
     if not BD_WAREHOUSE_AVAILABLE:
-        return create_placeholder_nut(size)
+        return None
     
     try:
         # Format size with pitch if not provided
@@ -521,29 +295,27 @@ def create_hex_nut(size, fastener_type="iso4032"):
             size_with_pitch = size
         
         nut = HexNut(size=size_with_pitch, fastener_type=fastener_type)
-        # Return placeholder geometry for cloud compatibility
-        return create_placeholder_nut(size)
+        return b3d.Part(nut.wrapped)  # Wrap TopoDS in build123d Part
     except Exception as e:
         print(f"Hex nut creation failed: {e}")
-        return create_placeholder_nut(size)
+        return None
 
 def create_washer(size, fastener_type="iso7089"):
     """Create professional washer using bd_warehouse"""
     if not BD_WAREHOUSE_AVAILABLE:
-        return create_placeholder_washer(size)
+        return None
     
     try:
         washer = PlainWasher(size=size, fastener_type=fastener_type)
-        # Return placeholder geometry for cloud compatibility
-        return create_placeholder_washer(size)
+        return b3d.Part(washer.wrapped)  # Wrap TopoDS in build123d Part
     except Exception as e:
         print(f"Washer creation failed: {e}")
-        return create_placeholder_washer(size)
+        return None
 
 def create_socket_screw(size, length, fastener_type="iso4762"):
     """Create professional socket head cap screw using bd_warehouse"""
     if not BD_WAREHOUSE_AVAILABLE:
-        return create_placeholder_bolt(size, length)
+        return None
     
     try:
         # Format size with pitch if not provided
@@ -556,11 +328,10 @@ def create_socket_screw(size, length, fastener_type="iso4762"):
             size_with_pitch = size
         
         screw = SocketHeadCapScrew(size=size_with_pitch, length=length, fastener_type=fastener_type)
-        # Return placeholder geometry for cloud compatibility
-        return create_placeholder_bolt(size, length)
+        return b3d.Part(screw.wrapped)  # Wrap TopoDS in build123d Part
     except Exception as e:
         print(f"Socket screw creation failed: {e}")
-        return create_placeholder_bolt(size, length)
+        return None
 
 def create_counter_sunk_screw(size, length, fastener_type="iso10642"):
     """Create professional counter-sunk screw using bd_warehouse"""
@@ -589,93 +360,41 @@ def create_counter_sunk_screw(size, length, fastener_type="iso10642"):
 # ==========================================
 
 def create_bearing(bearing_type="ball", size="M8-16-4"):
-    """Create professional bearing using bd_warehouse with build123d or trimesh fallback"""
-    if BUILD123D_AVAILABLE and BD_WAREHOUSE_AVAILABLE:
-        try:
-            print(f"Creating bearing with build123d: type={bearing_type}, size={size}")
-            if bearing_type == "ball":
-                bearing = SingleRowDeepGrooveBallBearing(
-                    size=size
-                )
-            elif bearing_type == "angular_contact":
-                bearing = SingleRowAngularContactBallBearing(
-                    size=size
-                )
-            elif bearing_type == "cylindrical":
-                bearing = SingleRowCylindricalRollerBearing(
-                    size=size
-                )
-            elif bearing_type == "tapered":
-                bearing = SingleRowTaperedRollerBearing(
-                    size=size
-                )
-            else:
-                bearing = SingleRowDeepGrooveBallBearing(
-                    size=size
-                )
-            
-            print(f"Bearing created successfully: {bearing}")
-            wrapped_part = b3d.Part(bearing.wrapped)
-            print(f"Wrapped part: {wrapped_part}")
-            return wrapped_part
-        except Exception as e:
-            print(f"build123d bearing creation failed: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    # Fallback to trimesh bearing
-    if not TRIMESH_AVAILABLE:
+    """Create professional bearing using bd_warehouse"""
+    if not BD_WAREHOUSE_AVAILABLE:
         return None
     
-    # Extract outer diameter from size string (e.g., "M8-16-4" -> 16)
     try:
-        parts = size.split('-')
-        if len(parts) >= 2:
-            outer_diameter = float(parts[1])
+        if bearing_type == "ball":
+            bearing = SingleRowDeepGrooveBallBearing(
+                size=size
+            )
+        elif bearing_type == "angular_contact":
+            bearing = SingleRowAngularContactBallBearing(
+                size=size
+            )
+        elif bearing_type == "cylindrical":
+            bearing = SingleRowCylindricalRollerBearing(
+                size=size
+            )
+        elif bearing_type == "tapered":
+            bearing = SingleRowTaperedRollerBearing(
+                size=size
+            )
         else:
-            outer_diameter = 16.0
-    except:
-        outer_diameter = 16.0
-    
-    # Create better bearing geometry with inner and outer rings
-    inner_diameter = outer_diameter * 0.6
-    thickness = outer_diameter * 0.25
-    
-    # Create outer ring
-    outer_ring = trimesh.creation.cylinder(radius=outer_diameter/2, height=thickness)
-    bore = trimesh.creation.cylinder(radius=inner_diameter/2, height=thickness)
-    outer_ring = outer_ring.difference(bore)
-    
-    # Create inner ring
-    inner_ring = trimesh.creation.cylinder(radius=inner_diameter/2, height=thickness)
-    inner_bore = trimesh.creation.cylinder(radius=inner_diameter*0.4/2, height=thickness)
-    inner_ring = inner_ring.difference(inner_bore)
-    
-    # Create simple ball bearings
-    ball_diameter = (outer_diameter - inner_diameter) / 4
-    ball_count = 8
-    balls = []
-    ball_radius = outer_diameter/2 - ball_diameter/2
-    
-    for i in range(ball_count):
-        angle = (2 * math.pi * i) / ball_count
-        ball_x = ball_radius * math.cos(angle)
-        ball_y = ball_radius * math.sin(angle)
-        ball = trimesh.creation.sphere(radius=ball_diameter/2)
-        ball.apply_translation([ball_x, ball_y, thickness/2])
-        balls.append(ball)
-    
-    # Combine all parts
-    bearing = outer_ring + inner_ring
-    for ball in balls:
-        bearing = bearing + ball
-    
-    return bearing
+            bearing = SingleRowDeepGrooveBallBearing(
+                size=size
+            )
+        
+        return b3d.Part(bearing.wrapped)  # Wrap TopoDS in build123d Part
+    except Exception as e:
+        print(f"Bearing creation failed: {e}")
+        return None
 
 def create_iso_thread(diameter, pitch, length, thread_type="external"):
     """Create professional ISO thread using bd_warehouse"""
     if not BD_WAREHOUSE_AVAILABLE:
-        return create_placeholder_thread(diameter, length)
+        return None
     
     try:
         thread = IsoThread(
@@ -684,11 +403,10 @@ def create_iso_thread(diameter, pitch, length, thread_type="external"):
             length=length,
             external=(thread_type == "external")
         )
-        # Return placeholder geometry for cloud compatibility
-        return create_placeholder_thread(diameter, length)
+        return b3d.Part(thread.wrapped)  # Wrap TopoDS in build123d Part
     except Exception as e:
         print(f"ISO thread creation failed: {e}")
-        return create_placeholder_thread(diameter, length)
+        return None
 
 def create_acme_thread(diameter, pitch, length, thread_type="external"):
     """Create professional ACME thread using bd_warehouse"""
@@ -710,7 +428,7 @@ def create_acme_thread(diameter, pitch, length, thread_type="external"):
 def create_pipe(nps, material="steel"):
     """Create professional pipe section using bd_warehouse"""
     if not BD_WAREHOUSE_AVAILABLE:
-        return create_placeholder_pipe(nps)
+        return None
     
     try:
         pipe_section = PipeSection(
@@ -718,11 +436,10 @@ def create_pipe(nps, material="steel"):
             material=material,
             identifier="40"  # Schedule 40 identifier
         )
-        # Return placeholder geometry for cloud compatibility
-        return create_placeholder_pipe(nps)
+        return b3d.Part(pipe_section.wrapped)  # Wrap TopoDS in build123d Part
     except Exception as e:
         print(f"Pipe creation failed: {e}")
-        return create_placeholder_pipe(nps)
+        return None
 
 def create_pipe_section(nps, material="steel", identifier="40"):
     """Create professional pipe section using bd_warehouse"""
@@ -743,13 +460,13 @@ def create_pipe_section(nps, material="steel", identifier="40"):
 def create_flange(nps, flange_type="slip_on", pressure_class=150):
     """Create professional flange using bd_warehouse"""
     if not BD_WAREHOUSE_AVAILABLE:
-        return create_placeholder_flange(nps, pressure_class)
+        return None
     
     try:
         # Convert string pressure_class to integer if needed
         if isinstance(pressure_class, str):
             pressure_class = int(pressure_class)
-            
+        
         if flange_type == "slip_on":
             flange = SlipOnFlange(
                 nps=nps,
@@ -781,11 +498,10 @@ def create_flange(nps, flange_type="slip_on", pressure_class=150):
                 flange_class=pressure_class
             )
         
-        # Return placeholder geometry for cloud compatibility
-        return create_placeholder_flange(nps, pressure_class)
+        return b3d.Part(flange.wrapped)  # Wrap TopoDS in build123d Part
     except Exception as e:
         print(f"Flange creation failed: {e}")
-        return create_placeholder_flange(nps, pressure_class)
+        return None
 
 def create_mechanical_assembly(bearing_type="ball", pipe_size="2", flange_type="slip_on"):
     """Create a simple mechanical assembly using BD Warehouse components"""
@@ -860,9 +576,8 @@ def execute_user_code(code: str):
     
     # Create namespace with available functions and modules
     namespace = {
+        'b3d': b3d,
         'math': math,
-        # Add build123d if available
-        'b3d': b3d if BUILD123D_AVAILABLE else None,
         # Gear functions
         'create_spur_gear': create_spur_gear,
         'create_helical_gear': create_helical_gear,
@@ -956,15 +671,13 @@ def setup_agent(brain_choice: str):
 def generate_cad_code(model, request: str) -> str:
     """Generate CAD code from text request using LiteLLMModel"""
     
-    prompt = f"""You are a CAD code generator. Generate Python code to create 3D parts using professional CAD libraries when available.
+    prompt = f"""You are a CAD code generator. Generate Python code to create 3D parts using build123d and BD Warehouse.
 
-IMPORTANT: The system will automatically use the best available CAD library:
-- If build123d is available: Creates professional, accurate components using BD Warehouse
-- If build123d is not available: Creates detailed trimesh geometries as fallback
+IMPORTANT: Use build123d (imported as 'b3d') and the available functions below for component creation.
 
 Available functions (USE THESE EXACTLY):
 
-GEAR FUNCTIONS (GGGEARS/Trimesh):
+GEAR FUNCTIONS (GGGEARS):
 - create_spur_gear(module, num_teeth, face_width, bore_diameter=0) - Creates a spur gear
 - create_helical_gear(module, num_teeth, helix_angle_deg, face_width, bore_diameter=0) - Creates a helical gear
 - create_bevel_gear(module, num_teeth, cone_angle_deg, face_width, bore_diameter=0) - Creates a bevel gear
@@ -1002,7 +715,7 @@ FLANGE FUNCTIONS (BD Warehouse):
   Types: "slip_on", "weld_neck", "blind", "lapped", "socket_weld"
   Pressure classes: "150", "300", "400", "600", "900", "1500", "2500"
 
-You also have access to build123d (as 'b3d') if available, and math module for other operations.
+You also have access to build123d (as 'b3d') and math module for other operations.
 
 CRITICAL REQUIREMENTS:
 1. You MUST create a variable called 'part' that contains final 3D part
