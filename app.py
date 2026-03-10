@@ -1,4 +1,16 @@
+import os
+
+# Create a virtual display for headless CAD rendering
+if os.environ.get('STREAMLIT_RUNTIME_ENV') or True:
+    try:
+        from xvfbwrapper import Xvfb
+        vdisplay = Xvfb(width=1280, height=720)
+        vdisplay.start()
+    except Exception as e:
+        print(f"Virtual display notice: {e}")
+
 import streamlit as st
+# ... rest of your imports (json, tempfile, backend, etc.)import streamlit as st
 import json
 import tempfile
 import re
@@ -528,3 +540,4 @@ st.markdown("""
     Transform text into industrial-grade 3D mechanical components
 </div>
 """, unsafe_allow_html=True)
+
