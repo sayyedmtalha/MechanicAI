@@ -18,13 +18,7 @@ try:
     STREAML_STL_AVAILABLE = True
 except ImportError:
     STREAML_STL_AVAILABLE = False
-    if not dependency_issues:
-        st.warning("⚠️ streamlit-stl not installed. 3D viewer will not work.")
-
-try:
-    from build123d import export_stl, export_step
-except ImportError:
-    st.warning("⚠️ build123d not installed. 3D viewer may not work.")
+    st.warning("⚠️ streamlit-stl not installed. 3D viewer will not work.")
 
 # ==========================================
 # PAGE CONFIG & STYLING
