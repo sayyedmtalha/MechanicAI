@@ -6,85 +6,64 @@ import tempfile
 import os
 import numpy as np
 
-# Try to import trimesh
-try:
-    import trimesh
-    TRIMESH_AVAILABLE = True
-except ImportError:
-    TRIMESH_AVAILABLE = False
-    print("⚠️ trimesh not available. STL export will not work.")
-
 # Try to import build123d
 try:
     import build123d as b3d
     BUILD123D_AVAILABLE = True
 except ImportError:
     BUILD123D_AVAILABLE = False
-    print("⚠️ build123d not available. Will use trimesh fallback.")
+    print("⚠️ build123d not available. STL export will not work.")
 
 def export_ascii_stl(part, filename):
     """
-    Export a build123d Part or trimesh object to ASCII STL format for streamlit-stl compatibility
+    Export a build123d Part to ASCII STL format for streamlit-stl compatibility
     
     Args:
-        part: build123d Part object or trimesh.Trimesh object
+        part: build123d Part object
         filename: Output filename
         
     Returns:
         bool: True if successful, False otherwise
     """
+    if not BUILD123D_AVAILABLE:
+        print("❌ build123d not available for STL export")
+        return False
+        
     try:
         # Handle different object types
         if hasattr(part, 'wrapped') or hasattr(part, 'export_step'):
             # This is a build123d Part object
             actual_part = part
-            if BUILD123D_AVAILABLE:
-                # Use build123d to export to binary first, then convert to ASCII
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".stl") as tmp_binary:
-                    b3d.export_stl(actual_part, tmp_binary.name)
+            
+            # Use build123d to export to binary first, then convert to ASCII
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".stl") as tmp_binary:
+                b3d.export_stl(actual_part, tmp_binary.name)
+                
+                # Read binary STL and convert to ASCII
+                try:
+                    import trimesh
+                    mesh = trimesh.load(tmp_binary.name)
+                    mesh.export(filename, file_type='stl_ascii')
                     
-                    # Read binary STL and convert to ASCII using trimesh
-                    if TRIMESH_AVAILABLE:
-                        try:
-                            mesh = trimesh.load(tmp_binary.name)
-                            mesh.export(filename, file_type='stl_ascii')
-                            
-                            # Verify it's ASCII format
-                            with open(filename, 'rb') as f:
-                                header = f.read(80)
-                                if header.startswith(b'solid'):
-                                    return True
-                                else:
-                                    print("Warning: Exported file is not in ASCII format")
-                                    return False
-                        except Exception as e:
-                            print(f"Trimesh conversion failed: {e}")
+                    # Verify it's ASCII format
+                    with open(filename, 'rb') as f:
+                        header = f.read(80)
+                        if header.startswith(b'solid'):
+                            return True
+                        else:
+                            print("Warning: Exported file is not in ASCII format")
                             return False
-                    else:
-                        print("Cannot convert to ASCII without trimesh")
-                        return False
-            else:
-                print("build123d object but build123d not available")
-                return False
-                
-        elif hasattr(part, 'export'):
-            # This is a trimesh object
-            actual_part = part
-            if TRIMESH_AVAILABLE:
-                # Export as ASCII STL explicitly
-                actual_part.export(filename, file_type='stl_ascii')
-                
-                # Verify it's ASCII format
-                with open(filename, 'rb') as f:
-                    header = f.read(80)
-                    if header.startswith(b'solid'):
-                        return True
-                    else:
-                        print("Warning: Exported file is not in ASCII format")
-                        return False
-            else:
-                print("trimesh object but trimesh not available")
-                return False
+                except ImportError:
+                    print("Cannot convert to ASCII without trimesh")
+                    return False
+                except Exception as e:
+                    print(f"Trimesh conversion failed: {e}")
+                    return False
+                finally:
+                    try:
+                        os.unlink(tmp_binary.name)
+                    except:
+                        pass
         else:
             # This is an unexpected object type
             print(f"Unexpected object type: {type(part)}")
@@ -116,14 +95,8 @@ def export_step(part, filename):
                 print("build123d object but build123d not available")
                 return False
         else:
-            # STEP export not supported for trimesh placeholder geometries
-            print("STEP export not supported for trimesh geometries")
-            # Create a simple text file as placeholder
-            with open(filename, 'w') as f:
-                f.write(f"; STEP file placeholder for component\n")
-                f.write(f"; Generated by MechanicAI\n")
-                f.write(f"; Component type: {type(part).__name__ if hasattr(part, '__name__') else 'Unknown'}\n")
-            return True
+            print("STEP export not supported for this object type")
+            return False
     except Exception as e:
         print(f"STEP export failed: {e}")
         return False
@@ -133,13 +106,13 @@ def create_stl_for_streamlit(part):
     Create an ASCII STL file suitable for streamlit-stl viewer
     
     Args:
-        part: build123d Part object or trimesh.Trimesh object
+        part: build123d Part object
         
     Returns:
         str: Path to the ASCII STL file, or None if failed
     """
-    if not (TRIMESH_AVAILABLE or BUILD123D_AVAILABLE):
-        print("❌ Cannot create STL for streamlit: no 3D libraries available")
+    if not BUILD123D_AVAILABLE:
+        print("❌ Cannot create STL for streamlit: build123d not available")
         return None
         
     try:
@@ -181,10 +154,7 @@ def check_dependencies():
     """Check if required dependencies are available"""
     issues = []
     
-    if not TRIMESH_AVAILABLE:
-        issues.append("❌ trimesh not available - STL export and 3D preview will not work")
-    
     if not BUILD123D_AVAILABLE:
-        issues.append("⚠️ build123d not available - Using trimesh fallback geometries")
+        issues.append("❌ build123d not available - STL export and 3D preview will not work")
     
     return issues
