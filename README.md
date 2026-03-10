@@ -82,10 +82,3 @@ This project stands on the shoulders of incredible open-source mechanical engine
 
 ---
 
-## 👨‍💻 About the Author
-
-Developed by a Mechanical Engineering student at **Zakir Husain College of Engineering and Technology (ZHCET)**, AMU. This project is part of an ongoing exploration into **Generative AI for Mechanical Design**.
-
----
-
-**Would you like me to help you write a `LICENSE` file or a contribution guide for this repository?**
