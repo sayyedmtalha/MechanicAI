@@ -1,31 +1,22 @@
 # Core Streamlit Application
-streamlit>=1.28.0
+streamlit>=1.31.0
 
 # CAD and 3D Modeling
-build123d>=0.3.0
-numpy>=1.24.0
+# Using broad versions to allow the installer to find Python 3.14 compatible wheels
+build123d>=0.6.0
+numpy>=1.26.0
 
 # AI and LLM Integration
-smolagents>=0.1.0
+smolagents>=1.0.0
 litellm>=1.45.0
 
 # 3D File Processing and Display
 trimesh>=4.0.0
-streamlit-stl>=0.3.0
+# FIXED: The latest version on PyPI is 0.0.6
+streamlit-stl==0.0.6
 
 # Professional Component Libraries
 bd-warehouse>=0.1.1
-# Note: gggears is included locally in the gggears/ folder
 
-# Development and Testing (Optional)
-pytest>=7.0.0
-black>=23.0.0
-flake8>=6.0.0
-
-# Performance and Optimization
-orjson>=3.9.0
-tqdm>=4.65.0
-
-# Security and Environment
+# Performance and Utilities
 python-dotenv>=1.0.0
-cryptography>=41.0.0
