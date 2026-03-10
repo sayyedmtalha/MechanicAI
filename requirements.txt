@@ -20,3 +20,6 @@ bd-warehouse>=0.1.1
 
 # Performance and Utilities
 python-dotenv>=1.0.0
+
+xvfbwrapper>=0.2.9
+
