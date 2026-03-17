@@ -88,4 +88,3 @@ Developed by a Mechanical Engineering student at **Zakir Husain College of Engin
 
 ---
 
-**Would you like me to help you write a `LICENSE` file or a contribution guide for this repository?**
